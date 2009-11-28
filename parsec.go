@@ -197,6 +197,13 @@ func Try(match Parser) Parser {
     }
 }
 
+// Helper for passing a parser by reference, e.g. for
+// infinite recursion: as := Many(Any(a, Parens(R(as))))
+func R(parser *Parser) Parser {
+        return func(in Vessel) (Output, bool) {
+                return (*parser)(in);
+        }
+}
 
 // Basic string vessel for parsing over a string input.
 type StringVessel struct {
