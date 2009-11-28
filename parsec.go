@@ -19,10 +19,28 @@ type Vessel interface {
 	GetPosition() Position;
 	SetPosition(Position);
 
+	GetSpec() Spec;
+	SetSpec(Spec);
+
 	Get(int) (Input, bool);
 	Next() (int, bool);
 	Pop(int);
 	Push(int);
+}
+
+// Specifications for the parser
+type Spec struct {
+	CommentStart	string;
+	CommentEnd	string;
+	CommentLine	string;
+	NestedComments	bool;
+	IdentStart	Parser;
+	IdentLetter	Parser;
+	OpStart		Parser;
+	OpLetter	Parser;
+	ReservedNames	[]string;
+	ReservedOpNames	[]string;
+	CaseSensitive	bool;
 }
 
 // A Parser is a function that takes a vessel and returns any matches
@@ -191,6 +209,26 @@ func Try(match Parser) Parser {
 	}
 }
 
+func Identifier(in Vessel) (name Output, ok bool) {
+	sp := in.GetSpec();
+	n, ok := sp.IdentStart(in);
+	if !ok {
+		return
+	}
+
+	ns, ok := Many(sp.IdentLetter)(in);
+	if !ok {
+		return
+	}
+
+	rest := make([]int, len(ns.([]interface{})));
+	for k, v := range ns.([]interface{}) {
+		rest[k] = v.(int)
+	}
+
+	return string(n.(int)) + string(rest), ok;
+}
+
 // Helper for passing a parser by reference, e.g. for
 // infinite recursion: as := Many(Any(a, Parens(R(as))))
 func R(parser *Parser) Parser {
@@ -202,6 +240,7 @@ type StringVessel struct {
 	state		State;
 	input		string;
 	position	Position;
+	spec		Spec;
 }
 
 func (self *StringVessel) GetState() State	{ return self.state }
@@ -239,3 +278,7 @@ func (self *StringVessel) GetPosition() Position {
 func (self *StringVessel) SetPosition(pos Position) {
 	self.position = pos
 }
+
+func (self *StringVessel) GetSpec() Spec	{ return self.spec }
+
+func (self *StringVessel) SetSpec(sp Spec)	{ self.spec = sp }
