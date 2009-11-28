@@ -129,7 +129,27 @@ func All(parsers ...) Parser {
 
 // Try matching begin, match, and then end.
 func Between(begin Parser, end Parser, match Parser) Parser {
-    return Try(All(begin, match, end));
+    return func(in Vessel) (Output, bool) {
+        before := in.GetPosition();
+
+        _, ok := begin(in);
+        if !ok {
+            return nil, false
+        }
+
+        out, ok := match(in);
+        if !ok {
+            in.SetPosition(before);
+            return nil, false
+        }
+
+        _, ok = end(in);
+        if !ok {
+            return nil, false
+        }
+
+        return out, true
+    }
 }
 
 // Lexeme parser for `match' wrapped in parens.
@@ -139,16 +159,7 @@ func Parens(match Parser) Parser {
 
 // Match a string and consume any following whitespace.
 func Symbol(str string) Parser {
-    return func(in Vessel) (Output, bool) {
-        match, ok := String(str)(in);
-        if !ok {
-            return nil, false
-        }
-
-        Whitespace(in);
-
-        return match, ok;
-    }
+    return Lexeme(String(str));
 }
 
 // Match a string and pop the string's length from the input.
