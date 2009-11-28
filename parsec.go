@@ -4,6 +4,7 @@ import (
     "container/vector";
     "reflect";
     "strings";
+    "unicode";
 )
 
 
@@ -18,7 +19,8 @@ type Vessel interface {
     GetPosition() Position;
     SetPosition(Position);
 
-    Get(int) Input;
+    Get(int) (Input, bool);
+    Next() (int, bool);
     Pop(int);
     Push(int);
 }
@@ -45,20 +47,11 @@ type Position struct {
 }
 
 
-func IsSpace(c byte) bool {
-    switch c {
-    case ' ', '\t', '\n', '\r', '\f', '\v', '\xa0':
-        return true;
-    }
-
-    return false;
-}
-
 // Token that satisfies a condition.
-func Satisfy(check func(c byte) bool) Parser {
+func Satisfy(check func(c int) bool) Parser {
     return func(in Vessel) (Output, bool) {
-        target := in.Get(1);
-        if target != nil && check(target.(string)[0]) {
+        target, ok := in.Next();
+        if ok && check(target) {
             in.Pop(1);
             return target, true;
         }
@@ -69,7 +62,7 @@ func Satisfy(check func(c byte) bool) Parser {
 
 // Skip whitespace (TODO: Comments)
 func Whitespace(in Vessel) (Output, bool) {
-    return Many(Satisfy(IsSpace))(in);
+    return Many(Satisfy(unicode.IsSpace))(in);
 }
 
 // Match a parser and skip whitespace
@@ -189,12 +182,20 @@ func (self *StringVessel) GetInput() Input {
     return self.input[self.position.Offset:];
 }
 
-func (self *StringVessel) Get(i int) Input {
+func (self *StringVessel) Get(i int) (Input, bool) {
     if len(self.input) < self.position.Offset + i {
-        return nil;
+        return "", false;
     }
 
-    return self.input[self.position.Offset:self.position.Offset + i];
+    return self.input[self.position.Offset:self.position.Offset + i], true;
+}
+
+func (self *StringVessel) Next() (int, bool) {
+    if len(self.input) < self.position.Offset + 1 {
+        return 0, false;
+    }
+
+    return int(self.input[self.position.Offset]), true;
 }
 
 func (self *StringVessel) Pop(i int) {
