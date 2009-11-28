@@ -109,34 +109,35 @@ func Any(parsers ...) Parser {
     }
 }
 
-func Between(begin Parser, end Parser, match Parser) Parser {
-    return func(in Vessel) (Output, bool) {
-        before := in.GetPosition();
+// Match all parsers, returning the final result. If one fails, it stops.
+// NOTE: this will not revert the state upon failure. Wrap calls in Try(...).
+func All(parsers ...) Parser {
+    return func(in Vessel) (match Output, ok bool) {
+        p := reflect.NewValue(parsers).(*reflect.StructValue);
 
-        _, ok := begin(in);
-        if !ok {
-            return nil, false
+        for i := 0; i < p.NumField(); i++ {
+            parser := p.Field(i).Interface().(Parser);
+            match, ok = parser(in);
+            if !ok {
+                return
+            }
         }
 
-        out, ok := match(in);
-        if !ok {
-            in.SetPosition(before);
-            return nil, false
-        }
-
-        _, ok = end(in);
-        if !ok {
-            return nil, false
-        }
-
-        return out, true
+        return;
     }
 }
 
+// Try matching begin, match, and then end.
+func Between(begin Parser, end Parser, match Parser) Parser {
+    return Try(All(begin, match, end));
+}
+
+// Lexeme parser for `match' wrapped in parens.
 func Parens(match Parser) Parser {
     return Lexeme(Between(Symbol("("), Symbol(")"), match));
 }
 
+// Match a string and consume any following whitespace.
 func Symbol(str string) Parser {
     return func(in Vessel) (Output, bool) {
         match, ok := String(str)(in);
@@ -159,6 +160,20 @@ func String(str string) Parser {
         }
 
         return nil, false;
+    }
+}
+
+// Try a parse and revert the state and position if it fails.
+func Try(match Parser) Parser {
+    return func(in Vessel) (Output, bool) {
+        st, pos := in.GetState(), in.GetPosition();
+        out, ok := match(in);
+        if !ok {
+            in.SetState(st);
+            in.SetPosition(pos);
+        }
+
+        return out, ok
     }
 }
 
