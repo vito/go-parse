@@ -127,28 +127,37 @@ func All(parsers ...) Parser {
     }
 }
 
+// Match all parsers, collecting their outputs into a vector.
+// If one parser fails, the whole thing fails.
+// NOTE: this will not revert the state upon failure. Wrap calls in Try(...).
+func Collect(parsers ...) Parser {
+    return func(in Vessel) (Output, bool) {
+        p := reflect.NewValue(parsers).(*reflect.StructValue);
+
+        matches := new(vector.Vector);
+        for i := 0; i < p.NumField(); i++ {
+            parser := p.Field(i).Interface().(Parser);
+            match, ok := parser(in);
+            if !ok {
+                return nil, false
+            }
+
+            matches.Push(match);
+        }
+
+        return matches, true;
+    }
+}
+
 // Try matching begin, match, and then end.
 func Between(begin Parser, end Parser, match Parser) Parser {
     return func(in Vessel) (Output, bool) {
-        before := in.GetPosition();
-
-        _, ok := begin(in);
+        parse, ok := Try(Collect(begin, match, end))(in);
         if !ok {
             return nil, false
         }
 
-        out, ok := match(in);
-        if !ok {
-            in.SetPosition(before);
-            return nil, false
-        }
-
-        _, ok = end(in);
-        if !ok {
-            return nil, false
-        }
-
-        return out, true
+        return parse.(*vector.Vector).At(1), true
     }
 }
 
