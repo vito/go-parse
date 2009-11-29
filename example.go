@@ -1,78 +1,149 @@
 package main
 
 import (
+    "container/vector";
 	"fmt";
-	"unicode";
+    "strings";
 
 	. "./parsec";
 )
 
-type aCall struct {
-	target	string;
-	args	[]Output;
+type rChar struct {
+    codepoint int;
+    str string;
+}
+type rGroup struct {
+    target interface{};
+}
+type rOption struct {
+    target interface{};
+}
+type rStar struct {
+    target interface{};
 }
 
-func call(in Vessel) (c Output, ok bool) {
-	name, ok := Identifier(in);
-	if !ok {
-		fmt.Printf("FAILED. %#v\n", name);
-		return;
-	}
-	fmt.Printf("PASSED. %#v\n", name);
 
-	call, ok := Parens(Many(Identifier))(in);
-	c = aCall{name.(string), call.([]interface{})};
-	return;
+func isSpecial(char int) bool {
+    switch char {
+        case '(', ')', '[', ']', '?', '^', '*', '.':
+            return true;
+    }
+
+    return false;
+}
+
+func isNotSpecial(char int) bool {
+    return !isSpecial(char);
+}
+
+func grouped(match Parser) Parser {
+    return func(in Vessel) (c Output, ok bool) {
+        call, ok := Between(String("("), String(")"), match)(in);
+        if !ok {
+            return;
+        }
+
+        c = rGroup{call};
+        return;
+    }
+}
+
+var normal Parser = func(in Vessel) (Output, bool) {
+    next, ok := in.Next();
+    if !ok || isSpecial(next) {
+        return nil, false
+    }
+
+    if next == '\\' {
+        in.Pop(1);
+        next, ok = in.Next();
+    }
+
+    if !ok {
+        return nil, false
+    }
+
+    in.Pop(1);
+
+    return rChar{next, string(next)}, true
+}
+
+var optional Parser = func(in Vessel) (Output, bool) {
+    result, ok := Collect(Any(normal, grouped(regexp)), String("?"))(in);
+    if !ok {
+        return nil, false
+    }
+
+    return rOption{result.(*vector.Vector).At(0)}, true;
+}
+
+var star Parser = func(in Vessel) (Output, bool) {
+    result, ok := Collect(Any(normal, grouped(regexp)), String("*"))(in);
+
+    if !ok {
+        return nil, false
+    }
+
+    return rStar{result.(*vector.Vector).At(0)}, true;
+}
+
+var regexp Parser = func(in Vessel) (Output, bool) {
+    return Many(Any(Try(star), Try(optional), Try(normal), grouped(R(&regexp))))(in);
+}
+
+// A hacked-together monstrosity that pretty-prints any complex
+// structure with indenting and whitespace and such.
+func pretty(thing interface{}) (s string) {
+    in := fmt.Sprintf("%#v\n", thing);
+
+    indent := 0;
+    inString := false;
+    for i, char := range in {
+        if !inString || char == '"' {
+            switch char {
+            case ',':
+                s += string(char) + "\n" + strings.Repeat("    ", indent);
+            case '(', '{':
+                if in[i+2] != '}' {
+                    indent++;
+                    s += string(char) + "\n" + strings.Repeat("    ", indent);
+                } else {
+                    s += "{}";
+                }
+            case ')', '}':
+                if in[i-2] != '{' {
+                    indent--;
+                    s += "\n" + strings.Repeat("    ", indent) + string(char);
+                }
+            case ':':
+                s += ": ";
+            case ' ':
+                if in[i-1] != ',' && in[i-9 : i] != "interface" {
+                    s += " ";
+                }
+            case '"':
+                inString = !inString;
+                fallthrough;
+            default:
+                s += string(char);
+            }
+        } else {
+            s += string(char);
+        }
+    }
+
+    return
 }
 
 func main() {
 	in := new(StringVessel);
-	in.SetInput(`< (>)((
-<
-))( (  (>)))  < >
->
+    in.SetInput(`a 日本語 \[\]\( ( b)?ccc*`);
 
-    >`);
+    fmt.Printf("Parsing `%s`...\n", in.GetInput());
 
-	in.SetSpec(Spec{
-		"/*",
-		"*/",
-		"//",
-		true,
-		Satisfy(unicode.IsLower),
-		Satisfy(unicode.IsLetter),
-		Satisfy(func(c int) bool { return !unicode.IsLetter(c) }),
-		Satisfy(func(c int) bool { return !unicode.IsLetter(c) }),
-		[]string{"func"},
-		[]string{"+", "-"},
-		true,
-	});
+	out, parsed := regexp(in);
 
-	ltgt := Any(Symbol("<"), Symbol(">"));
-
-	var parser Parser;
-	parser = Many(Any(ltgt, Parens(R(&parser))));
-	out, parsed := parser(in);
-
-	fmt.Printf("Matched: %#v\n", parsed);
-	fmt.Printf("Matches: %v\n", out);
-	fmt.Printf("Vessel: %+v\n", in);
-
-	try := Try(All(Symbol("<"), Parens(Symbol(">")), Symbol("("), Symbol("FAIL")));
-	in.SetPosition(Position{});
-	out, parsed = try(in);
-
-	fmt.Printf("\nTry results:\n");
-	fmt.Printf("Matched: %#v\n", parsed);
-	fmt.Printf("Matches: %+v\n", out);
-	fmt.Printf("Vessel: %+v\n", in);
-
-	in.SetInput("foo(bar)");
-	in.SetPosition(Position{});
-
-	out, parsed = call(in);
-	fmt.Printf("\nCall results:\n");
-	fmt.Printf("Matched: %#v\n", parsed);
-	fmt.Printf("Matches: %+v\n", out);
-	fmt.Printf("Vessel: %+v\n", in);
+	fmt.Printf("Parsed: %#v\n", parsed);
+	fmt.Printf("Tree: %s\n", pretty(out));
+    fmt.Printf("Rest: %#v\n", in.GetInput());
 }

@@ -94,7 +94,6 @@ func Lexeme(match Parser) Parser {
 func Many(match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
 		matches := new(vector.Vector);
-
 		for {
 			out, parsed := match(in);
 			if !parsed {
@@ -106,6 +105,29 @@ func Many(match Parser) Parser {
 
 		return matches.Data(), true;
 	}
+}
+
+// Match a parser seperated by another parser 0 or more times.
+// Trailing delimeters are valid.
+func SepBy(delim Parser, match Parser) Parser {
+    return func(in Vessel) (Output, bool) {
+        matches := new(vector.Vector);
+        for {
+            out, parsed := match(in);
+            if !parsed {
+                break
+            }
+
+            matches.Push(out);
+
+            _, sep := delim(in);
+            if !sep {
+                break
+            }
+        }
+
+        return matches, true
+    }
 }
 
 // Go through the parsers until one matches.
@@ -247,14 +269,36 @@ func (self *StringVessel) GetState() State	{ return self.state }
 
 func (self *StringVessel) SetState(st State)	{ self.state = st }
 
-func (self *StringVessel) GetInput() Input	{ return self.input[self.position.Offset:] }
+func (self *StringVessel) GetInput() Input	{
+    i := 0;
+    for o, _ := range self.input {
+        if i == self.position.Offset {
+            return self.input[o:];
+        }
+        i++
+    }
+
+    return ""
+}
 
 func (self *StringVessel) Get(i int) (Input, bool) {
 	if len(self.input) < self.position.Offset+i {
 		return "", false
 	}
 
-	return self.input[self.position.Offset : self.position.Offset+i], true;
+    s := "";
+    n := 0;
+    for _, v := range self.input {
+        if n >= self.position.Offset {
+            if n > self.position.Offset + i {
+                break
+            }
+            s += string(v);
+        }
+        n++
+    }
+
+    return s, true
 }
 
 func (self *StringVessel) Next() (int, bool) {
@@ -262,7 +306,15 @@ func (self *StringVessel) Next() (int, bool) {
 		return 0, false
 	}
 
-	return int(self.input[self.position.Offset]), true;
+    i := 0;
+    for _, v := range self.input {
+        if i == self.position.Offset {
+            return int(v), true;
+        }
+        i++
+    }
+
+	return 0, false;
 }
 
 func (self *StringVessel) Pop(i int)	{ self.position.Offset += i }
