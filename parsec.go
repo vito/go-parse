@@ -2,7 +2,7 @@ package parsec
 
 import (
 	"container/vector";
-    "fmt";
+    /*"fmt";*/
 	"reflect";
 	"unicode";
 )
@@ -38,8 +38,8 @@ type Spec struct {
 	IdentLetter	Parser;
 	OpStart		Parser;
 	OpLetter	Parser;
-	ReservedNames	[]string;
-	ReservedOpNames	[]string;
+	ReservedNames	[]Output;
+	ReservedOpNames	[]Output;
 	CaseSensitive	bool;
 }
 
@@ -121,8 +121,6 @@ var InMulti Parser = func(in Vessel) (Output, bool) {
     spec := in.GetSpec();
     startEnd := spec.CommentStart + spec.CommentEnd;
 
-    fmt.Println("In multi.", startEnd);
-
     return Any(
         Try(String(spec.CommentEnd)),
         All(MultiLineComment(), R(&InMulti)),
@@ -134,8 +132,6 @@ var InMulti Parser = func(in Vessel) (Output, bool) {
 var InSingle Parser = func(in Vessel) (Output, bool) {
     spec := in.GetSpec();
     startEnd := spec.CommentStart + spec.CommentEnd;
-
-    fmt.Println("In single.", startEnd);
 
     return Any(
         Try(String(spec.CommentEnd)),
@@ -158,7 +154,6 @@ func OneOf(cs string) Parser {
             }
         }
 
-        fmt.Println("Done with OneOf.", string(next), cs);
         return next, false
     }
 }
@@ -177,7 +172,6 @@ func NoneOf(cs string) Parser {
         }
 
         in.Pop(1);
-        fmt.Println("Done with NoneOf.", string(next), cs);
         return next, true
     }
 }
@@ -383,24 +377,33 @@ func Try(match Parser) Parser {
 	}
 }
 
-func Identifier(in Vessel) (name Output, ok bool) {
-	sp := in.GetSpec();
-	n, ok := sp.IdentStart(in);
-	if !ok {
-		return
-	}
+func Identifier() Parser {
+    return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
+        sp := in.GetSpec();
+        n, ok := sp.IdentStart(in);
+        if !ok {
+            return
+        }
 
-	ns, ok := Many(sp.IdentLetter)(in);
-	if !ok {
-		return
-	}
+        ns, ok := Many(sp.IdentLetter)(in);
+        if !ok {
+            return
+        }
 
-	rest := make([]int, len(ns.([]interface{})));
-	for k, v := range ns.([]interface{}) {
-		rest[k] = v.(int)
-	}
+        rest := make([]int, len(ns.([]interface{})));
+        for k, v := range ns.([]interface{}) {
+            rest[k] = v.(int)
+        }
 
-	return string(n.(int)) + string(rest), ok;
+        name = string(n.(int)) + string(rest);
+        for _, v := range sp.ReservedNames {
+            if v == name {
+                return nil, false
+            }
+        }
+
+        return
+    }))
 }
 
 // Helper for passing a parser by reference, e.g. for

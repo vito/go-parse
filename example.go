@@ -4,6 +4,7 @@ import (
     "container/vector";
 	"fmt";
     "strings";
+    "unicode";
 
 	. "./parsec";
 )
@@ -88,7 +89,7 @@ var star Parser = func(in Vessel) (Output, bool) {
 }
 
 var regexp Parser = func(in Vessel) (Output, bool) {
-    return Many(Any(Try(star), Try(optional), Skip(All(OneLineComment(), String("\n"))), MultiLineComment(), Try(normal), grouped(R(&regexp))))(in);
+    return Many(Any(Identifier(), Try(star), Try(optional), Skip(All(OneLineComment(), String("\n"))), MultiLineComment(), Try(normal), grouped(R(&regexp))))(in);
 }
 
 // A hacked-together monstrosity that pretty-prints any complex
@@ -142,10 +143,13 @@ func main() {
     spec.CommentStart = "{-";
     spec.CommentEnd = "-}";
     spec.NestedComments = true;
+    spec.IdentStart = Satisfy(unicode.IsUpper);
+    spec.IdentLetter = Satisfy(unicode.IsLower);
+    spec.ReservedNames = []Output{"Foo"};
     in.SetSpec(spec);
 
     in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment
-l*{- foo {- {- test -} -}-}`);
+l*{- foo {- {- test -} -}-}Bar Foo FizzBuzz`);
 
     fmt.Printf("Parsing `%s`...\n", in.GetInput());
 
