@@ -2,8 +2,8 @@ package parsec
 
 import (
 	"container/vector";
+    "fmt";
 	"reflect";
-	"strings";
 	"unicode";
 )
 
@@ -78,15 +78,136 @@ func Satisfy(check func(c int) bool) Parser {
 	}
 }
 
-// Skip whitespace (TODO: Comments)
-func Whitespace(in Vessel) (Output, bool)	{ return Many(Satisfy(unicode.IsSpace))(in) }
+// Skip whitespace and comments
+func Whitespace() Parser	{
+    return Many(Any(Satisfy(unicode.IsSpace), OneLineComment(), MultiLineComment()));
+}
+
+func OneLineComment() Parser {
+    return func(in Vessel) (Output, bool) {
+        if in.GetSpec().CommentLine == "" {
+            return nil, false
+        }
+
+        return Skip(All(
+            Try(String(in.GetSpec().CommentLine)),
+            Many(Satisfy(func(c int) bool { return c != '\n' }))
+        ))(in);
+    }
+}
+
+func MultiLineComment() Parser {
+    return func(in Vessel) (Output, bool) {
+        spec := in.GetSpec();
+
+        return Skip(All(
+            String(spec.CommentStart),
+            InComment()
+        ))(in);
+    }
+}
+
+func InComment() Parser {
+    return func(in Vessel) (Output, bool) {
+        if in.GetSpec().NestedComments {
+            return InMulti(in);
+        }
+
+        return InSingle(in);
+    }
+}
+
+var InMulti Parser = func(in Vessel) (Output, bool) {
+    spec := in.GetSpec();
+    startEnd := spec.CommentStart + spec.CommentEnd;
+
+    fmt.Println("In multi.", startEnd);
+
+    return Any(
+        Try(String(spec.CommentEnd)),
+        All(MultiLineComment(), R(&InMulti)),
+        All(Many1(NoneOf(startEnd)), R(&InMulti)),
+        All(OneOf(startEnd), R(&InMulti))
+    )(in)
+}
+
+var InSingle Parser = func(in Vessel) (Output, bool) {
+    spec := in.GetSpec();
+    startEnd := spec.CommentStart + spec.CommentEnd;
+
+    fmt.Println("In single.", startEnd);
+
+    return Any(
+        Try(String(spec.CommentEnd)),
+        All(Many1(NoneOf(startEnd)), R(&InSingle)),
+        All(OneOf(startEnd), R(&InSingle))
+    )(in)
+}
+
+func OneOf(cs string) Parser {
+    return func(in Vessel) (Output, bool) {
+        next, ok := in.Next();
+        if !ok {
+            return nil, false
+        }
+
+        for _, v := range cs {
+            if v == next {
+                in.Pop(1);
+                return v, true
+            }
+        }
+
+        fmt.Println("Done with OneOf.", string(next), cs);
+        return next, false
+    }
+}
+
+func NoneOf(cs string) Parser {
+    return func(in Vessel) (Output, bool) {
+        next, ok := in.Next();
+        if !ok {
+            return nil, false
+        }
+
+        for _, v := range cs {
+            if v == next {
+                return v, false
+            }
+        }
+
+        in.Pop(1);
+        fmt.Println("Done with NoneOf.", string(next), cs);
+        return next, true
+    }
+}
+
+func Skip(match Parser) Parser {
+    return func(in Vessel) (Output, bool) {
+        _, ok := match(in);
+        return nil, ok
+    }
+}
+
+func Token() Parser {
+    return func(in Vessel) (next Output, ok bool) {
+        next, ok = in.Next();
+        in.Pop(1);
+        return
+    }
+}
 
 // Match a parser and skip whitespace
 func Lexeme(match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
 		out, matched := match(in);
-		Whitespace(in);
-		return out, matched;
+        if !matched {
+            return nil, false
+        }
+
+		Whitespace()(in);
+
+        return out, true;
 	}
 }
 
@@ -100,11 +221,37 @@ func Many(match Parser) Parser {
 				break
 			}
 
-			matches.Push(out);
+			if out != nil {
+                matches.Push(out);
+            }
 		}
 
 		return matches.Data(), true;
 	}
+}
+
+func Many1(match Parser) Parser {
+    return func(in Vessel) (Output, bool) {
+        a, ok := match(in);
+        if !ok {
+            return nil, false
+        }
+
+        rest, ok := Many(match)(in);
+        if !ok {
+            return nil, false
+        }
+
+        as := rest.([]interface{});
+
+        all := make([]interface{}, len(as) + 1);
+        all[0] = a;
+        for i := 0; i < len(as); i++ {
+            all[i + 1] = as[i];
+        }
+
+        return all, true
+    }
 }
 
 // Match a parser seperated by another parser 0 or more times.
@@ -148,7 +295,7 @@ func Any(parsers ...) Parser {
 }
 
 // Match all parsers, returning the final result. If one fails, it stops.
-// NOTE: this will not revert the state upon failure. Wrap calls in Try(...).
+// NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
 func All(parsers ...) Parser {
 	return func(in Vessel) (match Output, ok bool) {
 		p := reflect.NewValue(parsers).(*reflect.StructValue);
@@ -167,7 +314,7 @@ func All(parsers ...) Parser {
 
 // Match all parsers, collecting their outputs into a vector.
 // If one parser fails, the whole thing fails.
-// NOTE: this will not revert the state upon failure. Wrap calls in Try(...).
+// NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
 func Collect(parsers ...) Parser {
 	return func(in Vessel) (Output, bool) {
 		p := reflect.NewValue(parsers).(*reflect.StructValue);
@@ -206,14 +353,19 @@ func Parens(match Parser) Parser	{ return Lexeme(Between(Symbol("("), Symbol(")"
 func Symbol(str string) Parser	{ return Lexeme(String(str)) }
 
 // Match a string and pop the string's length from the input.
+// NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
 func String(str string) Parser {
 	return func(in Vessel) (Output, bool) {
-		if strings.HasPrefix(in.GetInput().(string), str) {
-			in.Pop(len(str));
-			return str, true;
-		}
+        for _, v := range str {
+            next, ok := in.Next();
+            if !ok || next != v {
+                return nil, false
+            }
 
-		return nil, false;
+            in.Pop(1);
+        }
+
+		return str, true
 	}
 }
 
