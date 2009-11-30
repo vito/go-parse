@@ -1,7 +1,6 @@
 package main
 
 import (
-	"container/vector";
 	"fmt";
 	"strings";
 	"unicode";
@@ -116,7 +115,7 @@ func optional() Parser {
 			return nil, false
 		}
 
-		return rOption{result.(*vector.Vector).At(0)}, true;
+		return rOption{result.([]interface{})[0]}, true;
 	}
 }
 
@@ -128,7 +127,7 @@ func star() Parser {
 			return nil, false
 		}
 
-		return rStar{result.(*vector.Vector).At(0)}, true;
+		return rStar{result.([]interface{})[0]}, true;
 	}
 }
 
@@ -209,7 +208,7 @@ func main() {
 
 	in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment
 l*{- foo {- {- test -} -}-}Bar FooFizz
-Buzz\a\n\t\f`);
+Buzz\a\n\t\f\w\s\d*`);
 
 	fmt.Printf("Parsing `%s`...\n", in.GetInput());
 

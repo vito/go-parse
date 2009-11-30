@@ -324,7 +324,7 @@ func Collect(parsers ...) Parser {
 			matches.Push(match);
 		}
 
-		return matches, true;
+		return matches.Data(), true;
 	}
 }
 
@@ -336,7 +336,7 @@ func Between(begin Parser, end Parser, match Parser) Parser {
 			return nil, false
 		}
 
-		return parse.(*vector.Vector).At(1), true;
+		return parse.([]interface{})[1], true;
 	}
 }
 
