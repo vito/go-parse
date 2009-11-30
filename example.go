@@ -48,64 +48,62 @@ func grouped(match Parser) Parser {
 }
 
 func char() Parser {
-    return func(in Vessel) (Output, bool) {
-        next, ok := in.Next();
-        if !ok || isSpecial(next) {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		next, ok := in.Next();
+		if !ok || isSpecial(next) {
+			return nil, false
+		}
 
-        if next == '\\' {
-            in.Pop(1);
-            next, ok = in.Next();
-        }
+		if next == '\\' {
+			in.Pop(1);
+			next, ok = in.Next();
+		}
 
-        if !ok {
-            return nil, false
-        }
+		if !ok {
+			return nil, false
+		}
 
-        in.Pop(1);
+		in.Pop(1);
 
-        return rChar{next, string(next)}, true;
-    }
+		return rChar{next, string(next)}, true;
+	}
 }
 
 func optional() Parser {
-    return func(in Vessel) (Output, bool) {
-        result, ok := Collect(Any(char(), grouped(regexp())), String("?"))(in);
-        if !ok {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		result, ok := Collect(Any(char(), grouped(regexp())), String("?"))(in);
+		if !ok {
+			return nil, false
+		}
 
-        return rOption{result.(*vector.Vector).At(0)}, true;
-    }
+		return rOption{result.(*vector.Vector).At(0)}, true;
+	}
 }
 
 func star() Parser {
-    return func(in Vessel) (Output, bool) {
-        result, ok := Collect(Any(char(), grouped(regexp())), String("*"))(in);
+	return func(in Vessel) (Output, bool) {
+		result, ok := Collect(Any(char(), grouped(regexp())), String("*"))(in);
 
-        if !ok {
-            return nil, false
-        }
+		if !ok {
+			return nil, false
+		}
 
-        return rStar{result.(*vector.Vector).At(0)}, true;
-    }
+		return rStar{result.(*vector.Vector).At(0)}, true;
+	}
 }
 
 func regexp() Parser {
-    return func(in Vessel) (Output, bool) {
-        return Many(
-            Any(
-                Identifier(),
-                Try(star()),
-                Try(optional()),
-                Skip(All(OneLineComment(), String("\n"))),
-                MultiLineComment(),
-                Try(char()),
-                grouped(regexp())
-            )
-        )(in)
-    }
+	return func(in Vessel) (Output, bool) {
+		return Many(
+			Any(
+				Identifier(),
+				Try(star()),
+				Try(optional()),
+				Skip(All(OneLineComment(), String("\n"))),
+				MultiLineComment(),
+				Try(char()),
+				grouped(regexp())))(in)
+	}
 }
 
 // A hacked-together monstrosity that pretty-prints any complex
@@ -165,7 +163,7 @@ func main() {
 	in.SetSpec(spec);
 
 	in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment
-l*{- foo {- {- test -} -}-}Bar FooFizz   
+l*{- foo {- {- test -} -}-}Bar FooFizz
 Buzz`);
 
 	fmt.Printf("Parsing `%s`...\n", in.GetInput());

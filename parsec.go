@@ -116,30 +116,28 @@ func InComment() Parser {
 }
 
 func inMulti() Parser {
-    return func(in Vessel) (Output, bool) {
-        spec := in.GetSpec();
-        startEnd := spec.CommentStart + spec.CommentEnd;
+	return func(in Vessel) (Output, bool) {
+		spec := in.GetSpec();
+		startEnd := spec.CommentStart + spec.CommentEnd;
 
-        return Any(
-            Try(String(spec.CommentEnd)),
-            All(MultiLineComment(), inMulti()),
-            All(Many1(NoneOf(startEnd)), inMulti()),
-            All(OneOf(startEnd), inMulti())
-        )(in);
-    }
+		return Any(
+			Try(String(spec.CommentEnd)),
+			All(MultiLineComment(), inMulti()),
+			All(Many1(NoneOf(startEnd)), inMulti()),
+			All(OneOf(startEnd), inMulti()))(in);
+	}
 }
 
 func inSingle() Parser {
-    return func(in Vessel) (Output, bool) {
-        spec := in.GetSpec();
-        startEnd := spec.CommentStart + spec.CommentEnd;
+	return func(in Vessel) (Output, bool) {
+		spec := in.GetSpec();
+		startEnd := spec.CommentStart + spec.CommentEnd;
 
-        return Any(
-            Try(String(spec.CommentEnd)),
-            All(Many1(NoneOf(startEnd)), inSingle()),
-            All(OneOf(startEnd), inSingle())
-        )(in);
-    }
+		return Any(
+			Try(String(spec.CommentEnd)),
+			All(Many1(NoneOf(startEnd)), inSingle()),
+			All(OneOf(startEnd), inSingle()))(in);
+	}
 }
 
 func OneOf(cs string) Parser {
@@ -380,7 +378,7 @@ func Try(match Parser) Parser {
 }
 
 func Ident() Parser {
-    return func(in Vessel) (name Output, ok bool) {
+	return func(in Vessel) (name Output, ok bool) {
 		sp := in.GetSpec();
 		n, ok := sp.IdentStart(in);
 		if !ok {
@@ -398,15 +396,15 @@ func Ident() Parser {
 		}
 
 		return string(n.(int)) + string(rest), true;
-    }
+	}
 }
 
 func Identifier() Parser {
 	return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
-        name, ok = Ident()(in);
-        if !ok {
-            return
-        }
+		name, ok = Ident()(in);
+		if !ok {
+			return
+		}
 
 		for _, v := range in.GetSpec().ReservedNames {
 			if v == name {
