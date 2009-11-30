@@ -373,8 +373,8 @@ func Try(match Parser) Parser {
 	}
 }
 
-func Identifier() Parser {
-	return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
+func Ident() Parser {
+    return func(in Vessel) (name Output, ok bool) {
 		sp := in.GetSpec();
 		n, ok := sp.IdentStart(in);
 		if !ok {
@@ -391,8 +391,18 @@ func Identifier() Parser {
 			rest[k] = v.(int)
 		}
 
-		name = string(n.(int)) + string(rest);
-		for _, v := range sp.ReservedNames {
+		return string(n.(int)) + string(rest), true;
+    }
+}
+
+func Identifier() Parser {
+	return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
+        name, ok = Ident()(in);
+        if !ok {
+            return
+        }
+
+		for _, v := range in.GetSpec().ReservedNames {
 			if v == name {
 				return nil, false
 			}
