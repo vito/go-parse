@@ -108,32 +108,38 @@ func MultiLineComment() Parser {
 func InComment() Parser {
 	return func(in Vessel) (Output, bool) {
 		if in.GetSpec().NestedComments {
-			return InMulti(in)
+			return inMulti()(in)
 		}
 
-		return InSingle(in);
+		return inSingle()(in);
 	}
 }
 
-var InMulti Parser = func(in Vessel) (Output, bool) {
-	spec := in.GetSpec();
-	startEnd := spec.CommentStart + spec.CommentEnd;
+func inMulti() Parser {
+    return func(in Vessel) (Output, bool) {
+        spec := in.GetSpec();
+        startEnd := spec.CommentStart + spec.CommentEnd;
 
-	return Any(
-		Try(String(spec.CommentEnd)),
-		All(MultiLineComment(), R(&InMulti)),
-		All(Many1(NoneOf(startEnd)), R(&InMulti)),
-		All(OneOf(startEnd), R(&InMulti)))(in);
+        return Any(
+            Try(String(spec.CommentEnd)),
+            All(MultiLineComment(), inMulti()),
+            All(Many1(NoneOf(startEnd)), inMulti()),
+            All(OneOf(startEnd), inMulti())
+        )(in);
+    }
 }
 
-var InSingle Parser = func(in Vessel) (Output, bool) {
-	spec := in.GetSpec();
-	startEnd := spec.CommentStart + spec.CommentEnd;
+func inSingle() Parser {
+    return func(in Vessel) (Output, bool) {
+        spec := in.GetSpec();
+        startEnd := spec.CommentStart + spec.CommentEnd;
 
-	return Any(
-		Try(String(spec.CommentEnd)),
-		All(Many1(NoneOf(startEnd)), R(&InSingle)),
-		All(OneOf(startEnd), R(&InSingle)))(in);
+        return Any(
+            Try(String(spec.CommentEnd)),
+            All(Many1(NoneOf(startEnd)), inSingle()),
+            All(OneOf(startEnd), inSingle())
+        )(in);
+    }
 }
 
 func OneOf(cs string) Parser {
