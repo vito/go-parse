@@ -10,8 +10,12 @@ import (
 )
 
 type rChar struct {
-	codepoint	int;
+	char	int;
 	str		string;
+}
+type rToken struct {
+	char	int;
+	str	string;
 }
 type rGroup struct {
 	target interface{};
@@ -24,16 +28,50 @@ type rStar struct {
 }
 
 
-func isSpecial(char int) bool {
+func isMeta(char int) bool {
 	switch char {
-	case '(', ')', '[', ']', '?', '^', '*', '.':
+	case '(', ')', '[', ']', '?', '^', '*', '.', '+', '$', '|':
 		return true
 	}
 
 	return false;
 }
 
+func isSpecial(char int) bool {
+	switch char {
+	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\':
+		return true;
+	case 'w', 's', 'd':
+		return true;
+	}
+
+	return false;
+}
+
+func isNotMeta(char int) bool	{ return !isMeta(char) }
+
 func isNotSpecial(char int) bool	{ return !isSpecial(char) }
+
+func special(char int) Output {
+	switch char {
+	case '\\':
+		return rChar{'\\', "\\"};
+	case 'a', 'b', 'f':
+		return rChar{char - 90, string(char - 90)};
+	case 'n':
+		return rChar{'\n', "\n"};
+	case 'r':
+		return rChar{'\r', "\r"};
+	case 't':
+		return rChar{'\t', "\t"};
+	case 'v':
+		return rChar{'\v', "\v"};
+	case 'w', 's', 'd':
+		return rToken{char, string(char)};
+	}
+
+	return nil
+}
 
 func grouped(match Parser) Parser {
 	return func(in Vessel) (c Output, ok bool) {
@@ -48,24 +86,26 @@ func grouped(match Parser) Parser {
 }
 
 func char() Parser {
-	return func(in Vessel) (Output, bool) {
-		next, ok := in.Next();
-		if !ok || isSpecial(next) {
-			return nil, false
-		}
-
-		if next == '\\' {
-			in.Pop(1);
-			next, ok = in.Next();
-		}
-
+	return func(in Vessel) (out Output, ok bool) {
+		next, ok := Satisfy(isNotMeta)(in);
 		if !ok {
-			return nil, false
+			return
 		}
 
-		in.Pop(1);
+		char := next.(int);
+		if char == '\\' {
+			next, ok = Satisfy(func(c int) bool { return isMeta(c) || isSpecial(c) })(in);
+			if ok {
+				char = next.(int);
+				if isSpecial(char) {
+					out = special(char);
+				}
+			}
+		} else {
+			out = rChar{char, string(char)};
+		}
 
-		return rChar{next, string(next)}, true;
+		return
 	}
 }
 
@@ -102,7 +142,7 @@ func regexp() Parser {
 				Skip(All(OneLineComment(), String("\n"))),
 				MultiLineComment(),
 				Try(char()),
-				grouped(regexp())))(in)
+				grouped(regexp())))(in);
 	}
 }
 
@@ -152,25 +192,39 @@ func pretty(thing interface{}) (s string) {
 
 func main() {
 	in := new(StringVessel);
-	spec := Spec{};
-	spec.CommentLine = "--";
-	spec.CommentStart = "{-";
-	spec.CommentEnd = "-}";
-	spec.NestedComments = true;
-	spec.IdentStart = Satisfy(unicode.IsUpper);
-	spec.IdentLetter = Satisfy(unicode.IsLower);
-	spec.ReservedNames = []Output{"Foo"};
-	in.SetSpec(spec);
+
+	in.SetSpec(Spec{
+		"{-",
+		"-}",
+		"--",
+		true,
+		Satisfy(unicode.IsUpper),
+		Satisfy(unicode.IsLower),
+		nil,
+		nil,
+		[]Output{"Foo"},
+		nil,
+		true
+	});
 
 	in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment
 l*{- foo {- {- test -} -}-}Bar FooFizz
-Buzz`);
+Buzz\a\n\t\f`);
 
 	fmt.Printf("Parsing `%s`...\n", in.GetInput());
 
-	out, parsed := regexp()(in);
+	out, ok := regexp()(in);
 
-	fmt.Printf("Parsed: %#v\n", parsed);
+	if _, unfinished := in.Next(); unfinished {
+		fmt.Printf("Incomplete parse: %s\n", pretty(out));
+		fmt.Println("Parse error.");
+		fmt.Printf("Position: %+v\n", in.GetPosition());
+		fmt.Printf("State: %+v\n", in.GetState());
+		fmt.Printf("Rest: `%s`\n", in.GetInput());
+		return
+	}
+
+	fmt.Printf("Parsed: %#v\n", ok);
 	fmt.Printf("Tree: %s\n", pretty(out));
 	fmt.Printf("Rest: %#v\n", in.GetInput());
 }
