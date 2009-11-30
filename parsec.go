@@ -2,7 +2,7 @@ package parsec
 
 import (
 	"container/vector";
-    /*"fmt";*/
+	/*"fmt";*/
 	"reflect";
 	"unicode";
 )
@@ -79,129 +79,125 @@ func Satisfy(check func(c int) bool) Parser {
 }
 
 // Skip whitespace and comments
-func Whitespace() Parser	{
-    return Many(Any(Satisfy(unicode.IsSpace), OneLineComment(), MultiLineComment()));
+func Whitespace() Parser {
+	return Many(Any(Satisfy(unicode.IsSpace), OneLineComment(), MultiLineComment()))
 }
 
 func OneLineComment() Parser {
-    return func(in Vessel) (Output, bool) {
-        if in.GetSpec().CommentLine == "" {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		if in.GetSpec().CommentLine == "" {
+			return nil, false
+		}
 
-        return Skip(All(
-            Try(String(in.GetSpec().CommentLine)),
-            Many(Satisfy(func(c int) bool { return c != '\n' }))
-        ))(in);
-    }
+		return Skip(All(
+			Try(String(in.GetSpec().CommentLine)),
+			Many(Satisfy(func(c int) bool { return c != '\n' }))))(in);
+	}
 }
 
 func MultiLineComment() Parser {
-    return func(in Vessel) (Output, bool) {
-        spec := in.GetSpec();
+	return func(in Vessel) (Output, bool) {
+		spec := in.GetSpec();
 
-        return Skip(All(
-            String(spec.CommentStart),
-            InComment()
-        ))(in);
-    }
+		return Skip(All(
+			String(spec.CommentStart),
+			InComment()))(in);
+	}
 }
 
 func InComment() Parser {
-    return func(in Vessel) (Output, bool) {
-        if in.GetSpec().NestedComments {
-            return InMulti(in);
-        }
+	return func(in Vessel) (Output, bool) {
+		if in.GetSpec().NestedComments {
+			return InMulti(in)
+		}
 
-        return InSingle(in);
-    }
+		return InSingle(in);
+	}
 }
 
 var InMulti Parser = func(in Vessel) (Output, bool) {
-    spec := in.GetSpec();
-    startEnd := spec.CommentStart + spec.CommentEnd;
+	spec := in.GetSpec();
+	startEnd := spec.CommentStart + spec.CommentEnd;
 
-    return Any(
-        Try(String(spec.CommentEnd)),
-        All(MultiLineComment(), R(&InMulti)),
-        All(Many1(NoneOf(startEnd)), R(&InMulti)),
-        All(OneOf(startEnd), R(&InMulti))
-    )(in)
+	return Any(
+		Try(String(spec.CommentEnd)),
+		All(MultiLineComment(), R(&InMulti)),
+		All(Many1(NoneOf(startEnd)), R(&InMulti)),
+		All(OneOf(startEnd), R(&InMulti)))(in);
 }
 
 var InSingle Parser = func(in Vessel) (Output, bool) {
-    spec := in.GetSpec();
-    startEnd := spec.CommentStart + spec.CommentEnd;
+	spec := in.GetSpec();
+	startEnd := spec.CommentStart + spec.CommentEnd;
 
-    return Any(
-        Try(String(spec.CommentEnd)),
-        All(Many1(NoneOf(startEnd)), R(&InSingle)),
-        All(OneOf(startEnd), R(&InSingle))
-    )(in)
+	return Any(
+		Try(String(spec.CommentEnd)),
+		All(Many1(NoneOf(startEnd)), R(&InSingle)),
+		All(OneOf(startEnd), R(&InSingle)))(in);
 }
 
 func OneOf(cs string) Parser {
-    return func(in Vessel) (Output, bool) {
-        next, ok := in.Next();
-        if !ok {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		next, ok := in.Next();
+		if !ok {
+			return nil, false
+		}
 
-        for _, v := range cs {
-            if v == next {
-                in.Pop(1);
-                return v, true
-            }
-        }
+		for _, v := range cs {
+			if v == next {
+				in.Pop(1);
+				return v, true;
+			}
+		}
 
-        return next, false
-    }
+		return next, false;
+	}
 }
 
 func NoneOf(cs string) Parser {
-    return func(in Vessel) (Output, bool) {
-        next, ok := in.Next();
-        if !ok {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		next, ok := in.Next();
+		if !ok {
+			return nil, false
+		}
 
-        for _, v := range cs {
-            if v == next {
-                return v, false
-            }
-        }
+		for _, v := range cs {
+			if v == next {
+				return v, false
+			}
+		}
 
-        in.Pop(1);
-        return next, true
-    }
+		in.Pop(1);
+		return next, true;
+	}
 }
 
 func Skip(match Parser) Parser {
-    return func(in Vessel) (Output, bool) {
-        _, ok := match(in);
-        return nil, ok
-    }
+	return func(in Vessel) (Output, bool) {
+		_, ok := match(in);
+		return nil, ok;
+	}
 }
 
 func Token() Parser {
-    return func(in Vessel) (next Output, ok bool) {
-        next, ok = in.Next();
-        in.Pop(1);
-        return
-    }
+	return func(in Vessel) (next Output, ok bool) {
+		next, ok = in.Next();
+		in.Pop(1);
+		return;
+	}
 }
 
 // Match a parser and skip whitespace
 func Lexeme(match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
 		out, matched := match(in);
-        if !matched {
-            return nil, false
-        }
+		if !matched {
+			return nil, false
+		}
 
 		Whitespace()(in);
 
-        return out, true;
+		return out, true;
 	}
 }
 
@@ -216,8 +212,8 @@ func Many(match Parser) Parser {
 			}
 
 			if out != nil {
-                matches.Push(out);
-            }
+				matches.Push(out)
+			}
 		}
 
 		return matches.Data(), true;
@@ -225,50 +221,50 @@ func Many(match Parser) Parser {
 }
 
 func Many1(match Parser) Parser {
-    return func(in Vessel) (Output, bool) {
-        a, ok := match(in);
-        if !ok {
-            return nil, false
-        }
+	return func(in Vessel) (Output, bool) {
+		a, ok := match(in);
+		if !ok {
+			return nil, false
+		}
 
-        rest, ok := Many(match)(in);
-        if !ok {
-            return nil, false
-        }
+		rest, ok := Many(match)(in);
+		if !ok {
+			return nil, false
+		}
 
-        as := rest.([]interface{});
+		as := rest.([]interface{});
 
-        all := make([]interface{}, len(as) + 1);
-        all[0] = a;
-        for i := 0; i < len(as); i++ {
-            all[i + 1] = as[i];
-        }
+		all := make([]interface{}, len(as)+1);
+		all[0] = a;
+		for i := 0; i < len(as); i++ {
+			all[i+1] = as[i]
+		}
 
-        return all, true
-    }
+		return all, true;
+	}
 }
 
 // Match a parser seperated by another parser 0 or more times.
 // Trailing delimeters are valid.
 func SepBy(delim Parser, match Parser) Parser {
-    return func(in Vessel) (Output, bool) {
-        matches := new(vector.Vector);
-        for {
-            out, parsed := match(in);
-            if !parsed {
-                break
-            }
+	return func(in Vessel) (Output, bool) {
+		matches := new(vector.Vector);
+		for {
+			out, parsed := match(in);
+			if !parsed {
+				break
+			}
 
-            matches.Push(out);
+			matches.Push(out);
 
-            _, sep := delim(in);
-            if !sep {
-                break
-            }
-        }
+			_, sep := delim(in);
+			if !sep {
+				break
+			}
+		}
 
-        return matches, true
-    }
+		return matches, true;
+	}
 }
 
 // Go through the parsers until one matches.
@@ -350,16 +346,16 @@ func Symbol(str string) Parser	{ return Lexeme(String(str)) }
 // NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
 func String(str string) Parser {
 	return func(in Vessel) (Output, bool) {
-        for _, v := range str {
-            next, ok := in.Next();
-            if !ok || next != v {
-                return nil, false
-            }
+		for _, v := range str {
+			next, ok := in.Next();
+			if !ok || next != v {
+				return nil, false
+			}
 
-            in.Pop(1);
-        }
+			in.Pop(1);
+		}
 
-		return str, true
+		return str, true;
 	}
 }
 
@@ -378,32 +374,32 @@ func Try(match Parser) Parser {
 }
 
 func Identifier() Parser {
-    return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
-        sp := in.GetSpec();
-        n, ok := sp.IdentStart(in);
-        if !ok {
-            return
-        }
+	return Lexeme(Try(func(in Vessel) (name Output, ok bool) {
+		sp := in.GetSpec();
+		n, ok := sp.IdentStart(in);
+		if !ok {
+			return
+		}
 
-        ns, ok := Many(sp.IdentLetter)(in);
-        if !ok {
-            return
-        }
+		ns, ok := Many(sp.IdentLetter)(in);
+		if !ok {
+			return
+		}
 
-        rest := make([]int, len(ns.([]interface{})));
-        for k, v := range ns.([]interface{}) {
-            rest[k] = v.(int)
-        }
+		rest := make([]int, len(ns.([]interface{})));
+		for k, v := range ns.([]interface{}) {
+			rest[k] = v.(int)
+		}
 
-        name = string(n.(int)) + string(rest);
-        for _, v := range sp.ReservedNames {
-            if v == name {
-                return nil, false
-            }
-        }
+		name = string(n.(int)) + string(rest);
+		for _, v := range sp.ReservedNames {
+			if v == name {
+				return nil, false
+			}
+		}
 
-        return
-    }))
+		return;
+	}))
 }
 
 // Helper for passing a parser by reference, e.g. for
@@ -424,16 +420,16 @@ func (self *StringVessel) GetState() State	{ return self.state }
 
 func (self *StringVessel) SetState(st State)	{ self.state = st }
 
-func (self *StringVessel) GetInput() Input	{
-    i := 0;
-    for o, _ := range self.input {
-        if i == self.position.Offset {
-            return self.input[o:];
-        }
-        i++
-    }
+func (self *StringVessel) GetInput() Input {
+	i := 0;
+	for o, _ := range self.input {
+		if i == self.position.Offset {
+			return self.input[o:]
+		}
+		i++;
+	}
 
-    return ""
+	return "";
 }
 
 func (self *StringVessel) Get(i int) (Input, bool) {
@@ -441,19 +437,19 @@ func (self *StringVessel) Get(i int) (Input, bool) {
 		return "", false
 	}
 
-    s := "";
-    n := 0;
-    for _, v := range self.input {
-        if n >= self.position.Offset {
-            if n > self.position.Offset + i {
-                break
-            }
-            s += string(v);
-        }
-        n++
-    }
+	s := "";
+	n := 0;
+	for _, v := range self.input {
+		if n >= self.position.Offset {
+			if n > self.position.Offset+i {
+				break
+			}
+			s += string(v);
+		}
+		n++;
+	}
 
-    return s, true
+	return s, true;
 }
 
 func (self *StringVessel) Next() (int, bool) {
@@ -461,13 +457,13 @@ func (self *StringVessel) Next() (int, bool) {
 		return 0, false
 	}
 
-    i := 0;
-    for _, v := range self.input {
-        if i == self.position.Offset {
-            return int(v), true;
-        }
-        i++
-    }
+	i := 0;
+	for _, v := range self.input {
+		if i == self.position.Offset {
+			return int(v), true
+		}
+		i++;
+	}
 
 	return 0, false;
 }
