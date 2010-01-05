@@ -1,29 +1,29 @@
 package main
 
 import (
-	"fmt";
-	"strings";
-	"unicode";
+	"fmt"
+	"strings"
+	"unicode"
 
-	. "./parsec";
+	. "./parsec"
 )
 
 type rChar struct {
-	char	int;
-	str		string;
+	char int
+	str  string
 }
 type rToken struct {
-	char	int;
-	str	string;
+	char int
+	str  string
 }
 type rGroup struct {
-	target interface{};
+	target interface{}
 }
 type rOption struct {
-	target interface{};
+	target interface{}
 }
 type rStar struct {
-	target interface{};
+	target interface{}
 }
 
 
@@ -33,40 +33,40 @@ func isMeta(char int) bool {
 		return true
 	}
 
-	return false;
+	return false
 }
 
 func isSpecial(char int) bool {
 	switch char {
 	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\':
-		return true;
+		return true
 	case 'w', 's', 'd':
-		return true;
+		return true
 	}
 
-	return false;
+	return false
 }
 
-func isNotMeta(char int) bool	{ return !isMeta(char) }
+func isNotMeta(char int) bool { return !isMeta(char) }
 
-func isNotSpecial(char int) bool	{ return !isSpecial(char) }
+func isNotSpecial(char int) bool { return !isSpecial(char) }
 
 func special(char int) Output {
 	switch char {
 	case '\\':
-		return rChar{'\\', "\\"};
+		return rChar{'\\', "\\"}
 	case 'a', 'b', 'f':
-		return rChar{char - 90, string(char - 90)};
+		return rChar{char - 90, string(char - 90)}
 	case 'n':
-		return rChar{'\n', "\n"};
+		return rChar{'\n', "\n"}
 	case 'r':
-		return rChar{'\r', "\r"};
+		return rChar{'\r', "\r"}
 	case 't':
-		return rChar{'\t', "\t"};
+		return rChar{'\t', "\t"}
 	case 'v':
-		return rChar{'\v', "\v"};
+		return rChar{'\v', "\v"}
 	case 'w', 's', 'd':
-		return rToken{char, string(char)};
+		return rToken{char, string(char)}
 	}
 
 	return nil
@@ -74,34 +74,34 @@ func special(char int) Output {
 
 func grouped(match Parser) Parser {
 	return func(in Vessel) (c Output, ok bool) {
-		call, ok := Between(String("("), String(")"), match)(in);
+		call, ok := Between(String("("), String(")"), match)(in)
 		if !ok {
 			return
 		}
 
-		c = rGroup{call};
-		return;
+		c = rGroup{call}
+		return
 	}
 }
 
 func char() Parser {
 	return func(in Vessel) (out Output, ok bool) {
-		next, ok := Satisfy(isNotMeta)(in);
+		next, ok := Satisfy(isNotMeta)(in)
 		if !ok {
 			return
 		}
 
-		char := next.(int);
+		char := next.(int)
 		if char == '\\' {
-			next, ok = Satisfy(func(c int) bool { return isMeta(c) || isSpecial(c) })(in);
+			next, ok = Satisfy(func(c int) bool { return isMeta(c) || isSpecial(c) })(in)
 			if ok {
-				char = next.(int);
+				char = next.(int)
 				if isSpecial(char) {
-					out = special(char);
+					out = special(char)
 				}
 			}
 		} else {
-			out = rChar{char, string(char)};
+			out = rChar{char, string(char)}
 		}
 
 		return
@@ -110,24 +110,24 @@ func char() Parser {
 
 func optional() Parser {
 	return func(in Vessel) (Output, bool) {
-		result, ok := Collect(Any(char(), grouped(regexp())), String("?"))(in);
+		result, ok := Collect(Any(char(), grouped(regexp())), String("?"))(in)
 		if !ok {
 			return nil, false
 		}
 
-		return rOption{result.([]interface{})[0]}, true;
+		return rOption{result.([]interface{})[0]}, true
 	}
 }
 
 func star() Parser {
 	return func(in Vessel) (Output, bool) {
-		result, ok := Collect(Any(char(), grouped(regexp())), String("*"))(in);
+		result, ok := Collect(Any(char(), grouped(regexp())), String("*"))(in)
 
 		if !ok {
 			return nil, false
 		}
 
-		return rStar{result.([]interface{})[0]}, true;
+		return rStar{result.([]interface{})[0]}, true
 	}
 }
 
@@ -141,17 +141,17 @@ func regexp() Parser {
 				Skip(All(OneLineComment(), String("\n"))),
 				MultiLineComment(),
 				Try(char()),
-				grouped(regexp())))(in);
+				grouped(regexp())))(in)
 	}
 }
 
 // A hacked-together monstrosity that pretty-prints any complex
 // structure with indenting and whitespace and such.
 func pretty(thing interface{}) (s string) {
-	in := fmt.Sprintf("%#v\n", thing);
+	in := fmt.Sprintf("%#v\n", thing)
 
-	indent := 0;
-	inString := false;
+	indent := 0
+	inString := false
 	for i, char := range in {
 		if !inString || char == '"' {
 			switch char {
@@ -159,15 +159,15 @@ func pretty(thing interface{}) (s string) {
 				s += string(char) + "\n" + strings.Repeat("    ", indent)
 			case '(', '{':
 				if in[i+2] != '}' {
-					indent++;
-					s += string(char) + "\n" + strings.Repeat("    ", indent);
+					indent++
+					s += string(char) + "\n" + strings.Repeat("    ", indent)
 				} else {
 					s += "{}"
 				}
 			case ')', '}':
 				if in[i-2] != '{' {
-					indent--;
-					s += "\n" + strings.Repeat("    ", indent) + string(char);
+					indent--
+					s += "\n" + strings.Repeat("    ", indent) + string(char)
 				}
 			case ':':
 				s += ": "
@@ -176,8 +176,8 @@ func pretty(thing interface{}) (s string) {
 					s += " "
 				}
 			case '"':
-				inString = !inString;
-				fallthrough;
+				inString = !inString
+				fallthrough
 			default:
 				s += string(char)
 			}
@@ -186,11 +186,11 @@ func pretty(thing interface{}) (s string) {
 		}
 	}
 
-	return;
+	return
 }
 
 func main() {
-	in := new(StringVessel);
+	in := new(StringVessel)
 
 	in.SetSpec(Spec{
 		"{-",
@@ -203,27 +203,27 @@ func main() {
 		nil,
 		[]Output{"Foo"},
 		nil,
-		true
-	});
+		true,
+	})
 
 	in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment
 l*{- foo {- {- test -} -}-}Bar FooFizz
-Buzz\a\n\t\f\w\s\d*`);
+Buzz\a\n\t\f\w\s\d*`)
 
-	fmt.Printf("Parsing `%s`...\n", in.GetInput());
+	fmt.Printf("Parsing `%s`...\n", in.GetInput())
 
-	out, ok := regexp()(in);
+	out, ok := regexp()(in)
 
 	if _, unfinished := in.Next(); unfinished {
-		fmt.Printf("Incomplete parse: %s\n", pretty(out));
-		fmt.Println("Parse error.");
-		fmt.Printf("Position: %+v\n", in.GetPosition());
-		fmt.Printf("State: %+v\n", in.GetState());
-		fmt.Printf("Rest: `%s`\n", in.GetInput());
+		fmt.Printf("Incomplete parse: %s\n", pretty(out))
+		fmt.Println("Parse error.")
+		fmt.Printf("Position: %+v\n", in.GetPosition())
+		fmt.Printf("State: %+v\n", in.GetState())
+		fmt.Printf("Rest: `%s`\n", in.GetInput())
 		return
 	}
 
-	fmt.Printf("Parsed: %#v\n", ok);
-	fmt.Printf("Tree: %s\n", pretty(out));
-	fmt.Printf("Rest: %#v\n", in.GetInput());
+	fmt.Printf("Parsed: %#v\n", ok)
+	fmt.Printf("Tree: %s\n", pretty(out))
+	fmt.Printf("Rest: %#v\n", in.GetInput())
 }
