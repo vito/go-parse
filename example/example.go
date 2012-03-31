@@ -5,15 +5,15 @@ import (
 	"strings"
 	"unicode"
 
-	. "./parsec"
+	. "github.com/vito/go-parse"
 )
 
 type rChar struct {
-	char int
+	char rune
 	str  string
 }
 type rToken struct {
-	char int
+	char rune
 	str  string
 }
 type rGroup struct {
@@ -26,8 +26,7 @@ type rStar struct {
 	target interface{}
 }
 
-
-func isMeta(char int) bool {
+func isMeta(char rune) bool {
 	switch char {
 	case '(', ')', '[', ']', '?', '^', '*', '.', '+', '$', '|':
 		return true
@@ -36,7 +35,7 @@ func isMeta(char int) bool {
 	return false
 }
 
-func isSpecial(char int) bool {
+func isSpecial(char rune) bool {
 	switch char {
 	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\':
 		return true
@@ -47,16 +46,16 @@ func isSpecial(char int) bool {
 	return false
 }
 
-func isNotMeta(char int) bool { return !isMeta(char) }
+func isNotMeta(char rune) bool { return !isMeta(char) }
 
-func isNotSpecial(char int) bool { return !isSpecial(char) }
+func isNotSpecial(char rune) bool { return !isSpecial(char) }
 
-func special(char int) Output {
+func special(char rune) Output {
 	switch char {
 	case '\\':
 		return rChar{'\\', "\\"}
 	case 'a', 'b', 'f':
-		return rChar{char - 90, string(char - 90)}
+		return rChar{char - rune(90), string(char - rune(90))}
 	case 'n':
 		return rChar{'\n', "\n"}
 	case 'r':
@@ -91,11 +90,11 @@ func char() Parser {
 			return
 		}
 
-		char := next.(int)
+		char := next.(rune)
 		if char == '\\' {
-			next, ok = Satisfy(func(c int) bool { return isMeta(c) || isSpecial(c) })(in)
+			next, ok = Satisfy(func(c rune) bool { return isMeta(c) || isSpecial(c) })(in)
 			if ok {
-				char = next.(int)
+				char = next.(rune)
 				if isSpecial(char) {
 					out = special(char)
 				}
