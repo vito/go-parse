@@ -1,12 +1,8 @@
 package parsec
 
 import (
-	"container/vector"
-	/*"fmt";*/
-	"reflect"
 	"unicode"
 )
-
 
 // Container of the input, position, and any user/parser state.
 type Vessel interface {
@@ -23,7 +19,7 @@ type Vessel interface {
 	SetSpec(Spec)
 
 	Get(int) (Input, bool)
-	Next() (int, bool)
+	Next() (rune, bool)
 	Pop(int)
 	Push(int)
 }
@@ -64,9 +60,8 @@ type Position struct {
 	Offset int
 }
 
-
 // Token that satisfies a condition.
-func Satisfy(check func(c int) bool) Parser {
+func Satisfy(check func(c rune) bool) Parser {
 	return func(in Vessel) (Output, bool) {
 		target, ok := in.Next()
 		if ok && check(target) {
@@ -91,7 +86,7 @@ func OneLineComment() Parser {
 
 		return Skip(All(
 			Try(String(in.GetSpec().CommentLine)),
-			Many(Satisfy(func(c int) bool { return c != '\n' }))))(in)
+			Many(Satisfy(func(c rune) bool { return c != '\n' }))))(in)
 	}
 }
 
@@ -208,7 +203,7 @@ func Lexeme(match Parser) Parser {
 // Match a parser 0 or more times.
 func Many(match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		matches := new(vector.Vector)
+		matches := []interface{}{}
 		for {
 			out, parsed := match(in)
 			if !parsed {
@@ -216,11 +211,11 @@ func Many(match Parser) Parser {
 			}
 
 			if out != nil {
-				matches.Push(out)
+				matches = append(matches, out)
 			}
 		}
 
-		return matches.Data(), true
+		return matches, true
 	}
 }
 
@@ -252,14 +247,14 @@ func Many1(match Parser) Parser {
 // Trailing delimeters are valid.
 func SepBy(delim Parser, match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		matches := new(vector.Vector)
+		matches := []interface{}{}
 		for {
 			out, parsed := match(in)
 			if !parsed {
 				break
 			}
 
-			matches.Push(out)
+			matches = append(matches, out)
 
 			_, sep := delim(in)
 			if !sep {
@@ -272,12 +267,9 @@ func SepBy(delim Parser, match Parser) Parser {
 }
 
 // Go through the parsers until one matches.
-func Any(parsers ...) Parser {
+func Any(parsers ...Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		p := reflect.NewValue(parsers).(*reflect.StructValue)
-
-		for i := 0; i < p.NumField(); i++ {
-			parser := p.Field(i).Interface().(Parser)
+		for _, parser := range parsers {
 			match, ok := parser(in)
 			if ok {
 				return match, ok
@@ -290,12 +282,9 @@ func Any(parsers ...) Parser {
 
 // Match all parsers, returning the final result. If one fails, it stops.
 // NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
-func All(parsers ...) Parser {
+func All(parsers ...Parser) Parser {
 	return func(in Vessel) (match Output, ok bool) {
-		p := reflect.NewValue(parsers).(*reflect.StructValue)
-
-		for i := 0; i < p.NumField(); i++ {
-			parser := p.Field(i).Interface().(Parser)
+		for _, parser := range parsers {
 			match, ok = parser(in)
 			if !ok {
 				return
@@ -309,22 +298,19 @@ func All(parsers ...) Parser {
 // Match all parsers, collecting their outputs into a vector.
 // If one parser fails, the whole thing fails.
 // NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
-func Collect(parsers ...) Parser {
+func Collect(parsers ...Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		p := reflect.NewValue(parsers).(*reflect.StructValue)
-
-		matches := new(vector.Vector)
-		for i := 0; i < p.NumField(); i++ {
-			parser := p.Field(i).Interface().(Parser)
+		matches := []interface{}{}
+		for _, parser := range parsers {
 			match, ok := parser(in)
 			if !ok {
 				return nil, false
 			}
 
-			matches.Push(match)
+			matches = append(matches, match)
 		}
 
-		return matches.Data(), true
+		return matches, true
 	}
 }
 
@@ -390,12 +376,12 @@ func Ident() Parser {
 			return
 		}
 
-		rest := make([]int, len(ns.([]interface{})))
+		rest := make([]rune, len(ns.([]interface{})))
 		for k, v := range ns.([]interface{}) {
-			rest[k] = v.(int)
+			rest[k] = v.(rune)
 		}
 
-		return string(n.(int)) + string(rest), true
+		return string(n.(rune)) + string(rest), true
 	}
 }
 
@@ -415,7 +401,6 @@ func Identifier() Parser {
 		return
 	}))
 }
-
 
 // Basic string vessel for parsing over a string input.
 type StringVessel struct {
@@ -461,7 +446,7 @@ func (self *StringVessel) Get(i int) (Input, bool) {
 	return s, true
 }
 
-func (self *StringVessel) Next() (int, bool) {
+func (self *StringVessel) Next() (rune, bool) {
 	if len(self.input) < self.position.Offset+1 {
 		return 0, false
 	}
@@ -469,7 +454,7 @@ func (self *StringVessel) Next() (int, bool) {
 	i := 0
 	for _, v := range self.input {
 		if i == self.position.Offset {
-			return int(v), true
+			return rune(v), true
 		}
 		i++
 	}
