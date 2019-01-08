@@ -51,6 +51,10 @@ func isNotMeta(char rune) bool { return !isMeta(char) }
 func isNotSpecial(char rune) bool { return !isSpecial(char) }
 
 func special(char rune) Output {
+	if isNotSpecial(char) {
+		return nil
+	}
+
 	switch char {
 	case '\\':
 		return rChar{'\\', "\\"}
@@ -192,17 +196,14 @@ func main() {
 	in := new(StringVessel)
 
 	in.SetSpec(Spec{
-		"{-",
-		"-}",
-		"--",
-		true,
-		Satisfy(unicode.IsUpper),
-		Satisfy(unicode.IsLower),
-		nil,
-		nil,
-		[]Output{"Foo"},
-		nil,
-		true,
+		CommentStart:   "{-",
+		CommentEnd:     "-}",
+		CommentLine:    "--",
+		NestedComments: true,
+		IdentStart:     Satisfy(unicode.IsUpper),
+		IdentLetter:    Satisfy(unicode.IsLower),
+		ReservedNames:  []Output{"Foo"},
+		CaseSensitive:  true,
 	})
 
 	in.SetInput(`a 日本語 \[\]\({- test -} ( b)?ccc*-- comment

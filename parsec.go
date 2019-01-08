@@ -203,7 +203,7 @@ func Lexeme(match Parser) Parser {
 // Match a parser 0 or more times.
 func Many(match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		matches := []interface{}{}
+		var matches []interface{}
 		for {
 			out, parsed := match(in)
 			if !parsed {
@@ -247,7 +247,7 @@ func Many1(match Parser) Parser {
 // Trailing delimeters are valid.
 func SepBy(delim Parser, match Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		matches := []interface{}{}
+		var matches []interface{}
 		for {
 			out, parsed := match(in)
 			if !parsed {
@@ -300,7 +300,7 @@ func All(parsers ...Parser) Parser {
 // NOTE: Consumes input on failure. Wrap calls in Try(...) to avoid.
 func Collect(parsers ...Parser) Parser {
 	return func(in Vessel) (Output, bool) {
-		matches := []interface{}{}
+		var matches []interface{}
 		for _, parser := range parsers {
 			match, ok := parser(in)
 			if !ok {
@@ -410,15 +410,15 @@ type StringVessel struct {
 	spec     Spec
 }
 
-func (self *StringVessel) GetState() State { return self.state }
+func (s *StringVessel) GetState() State { return s.state }
 
-func (self *StringVessel) SetState(st State) { self.state = st }
+func (s *StringVessel) SetState(st State) { s.state = st }
 
-func (self *StringVessel) GetInput() Input {
-	i := 0
-	for o, _ := range self.input {
-		if i == self.position.Offset {
-			return self.input[o:]
+func (s *StringVessel) GetInput() Input {
+	var i int
+	for o := range s.input {
+		if i == s.position.Offset {
+			return s.input[o:]
 		}
 		i++
 	}
@@ -426,19 +426,22 @@ func (self *StringVessel) GetInput() Input {
 	return ""
 }
 
-func (self *StringVessel) Get(i int) (Input, bool) {
-	if len(self.input) < self.position.Offset+i {
+func (s *StringVessel) Get(i int) (Input, bool) {
+	if len(s.input) < s.position.Offset+i {
 		return "", false
 	}
 
-	s := ""
-	n := 0
-	for _, v := range self.input {
-		if n >= self.position.Offset {
-			if n > self.position.Offset+i {
+	var (
+		n   int
+		str string
+	)
+
+	for _, v := range s.input {
+		if n >= s.position.Offset {
+			if n > s.position.Offset+i {
 				break
 			}
-			s += string(v)
+			str += string(v)
 		}
 		n++
 	}
@@ -446,14 +449,15 @@ func (self *StringVessel) Get(i int) (Input, bool) {
 	return s, true
 }
 
-func (self *StringVessel) Next() (rune, bool) {
-	if len(self.input) < self.position.Offset+1 {
+func (s *StringVessel) Next() (rune, bool) {
+	if len(s.input) < s.position.Offset+1 {
 		return 0, false
 	}
 
-	i := 0
-	for _, v := range self.input {
-		if i == self.position.Offset {
+	var i int
+
+	for _, v := range s.input {
+		if i == s.position.Offset {
 			return rune(v), true
 		}
 		i++
@@ -462,20 +466,20 @@ func (self *StringVessel) Next() (rune, bool) {
 	return 0, false
 }
 
-func (self *StringVessel) Pop(i int) { self.position.Offset += i }
+func (s *StringVessel) Pop(i int) { s.position.Offset += i }
 
-func (self *StringVessel) Push(i int) { self.position.Offset -= i }
+func (s *StringVessel) Push(i int) { s.position.Offset -= i }
 
-func (self *StringVessel) SetInput(in Input) { self.input = in.(string) }
+func (s *StringVessel) SetInput(in Input) { s.input = in.(string) }
 
-func (self *StringVessel) GetPosition() Position {
-	return self.position
+func (s *StringVessel) GetPosition() Position {
+	return s.position
 }
 
-func (self *StringVessel) SetPosition(pos Position) {
-	self.position = pos
+func (s *StringVessel) SetPosition(pos Position) {
+	s.position = pos
 }
 
-func (self *StringVessel) GetSpec() Spec { return self.spec }
+func (s *StringVessel) GetSpec() Spec { return s.spec }
 
-func (self *StringVessel) SetSpec(sp Spec) { self.spec = sp }
+func (s *StringVessel) SetSpec(sp Spec) { s.spec = sp }
